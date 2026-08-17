@@ -131,62 +131,144 @@ pio run -t menuconfig
 
 ### 3.3 JTAG Connection
 
-Start bridge and GDB:
+Start the bridge in one terminal, subscribe to console output in another:
 ```bash
+# Terminal 1: bridge
 python3 host/gdb_mqtt_bridge.py --broker <broker-ip> --device <device-id>
-riscv32-esp-elf-gdb -ex "target remote localhost:3333"
+
+# Terminal 2: UART console (keep open for all subsequent tests)
+mosquitto_sub -h <broker> -t "device/<device-id>/console/out"
 ```
 
-- [ ] `monitor target jtag` switches to JTAG backend
+Connect GDB and switch to the JTAG backend:
+```
+riscv32-esp-elf-gdb
+(gdb) target remote localhost:3333
+(gdb) monitor target jtag
+(gdb) flushregs
+```
+
+Note: `flushregs` is required after `monitor target jtag` — GDB caches registers from the previous backend (ESP32 local) and `monitor` commands don't invalidate the cache. Without it, `info registers` shows stale ESP32 values (0x3fc... addresses).
+
+- [ ] `monitor target jtag` — ESP32 serial log shows "Debug Module active, dmstatus=0x004c0c82" (or similar, version 0.13, authenticated)
 - [ ] No JTAG errors in ESP32 serial log
-- [ ] `info registers` returns VexRiscv register values (not ESP32 registers)
-- [ ] `x/4x 0x00000000` reads ROM region
-- [ ] `x/4x 0x10000000` reads SRAM region
+- [ ] `info registers` — shows VexRiscv values (sp in 0x10000000 range, not 0x3fc...)
+- [ ] `x/4x 0x00000000` — reads ROM region (non-zero: LiteX BIOS code)
+- [ ] `x/4x 0x10000000` — reads SRAM region
 
 ### 3.4 Halt and Resume
 
-- [ ] Ctrl-C halts the VexRiscv (ESP32 log confirms halt)
+```
+(gdb) continue
+(gdb) [Ctrl-C]
+(gdb) info registers
+(gdb) continue
+```
+
+- [ ] Ctrl-C halts the VexRiscv (ESP32 serial log shows "Hart halted")
 - [ ] `info registers` works while halted
-- [ ] `continue` resumes the VexRiscv
+- [ ] `continue` resumes (ESP32 serial log shows "Hart resumed")
 
-### 3.5 Load Test Binaries
+### 3.5 Memory Write Verification
 
-Note: Tang Primer 25K dock has no user LEDs. Test binaries use UART output instead.
+This must pass before attempting `riscv_load`. Memory writes use the Debug Module program buffer (`sw s1, 0(s0)`) which has not been tested through the tunnel protocol.
 
-- [ ] Upload hello.bin to ramfs via file manager
-- [ ] `monitor riscv_load hello.bin` — "Hello from VexRiscv!" appears on console/out
-- [ ] Upload count.bin, `monitor riscv_load count.bin` — incrementing hex counter on console/out
-- [ ] Halt (Ctrl-C) — counter stops; resume (`continue`) — counter continues from where it left off
+```
+(gdb) [Ctrl-C if not already halted]
+(gdb) set *0x10000000 = 0xdeadbeef
+(gdb) x/x 0x10000000
+```
+
+Expected: `0x10000000: 0xdeadbeef`
+
+```
+(gdb) set *0x10000004 = 0xcafef00d
+(gdb) x/2x 0x10000000
+```
+
+Expected: `0x10000000: 0xdeadbeef 0xcafef00d`
+
+- [ ] Single word write + readback matches
+- [ ] Second word write at adjacent address works (tests sequential writes)
+- [ ] CSR write: `set *0xf0001800 = 0x3` then `x/x 0xf0001800` (no visible LEDs, but register should read back)
+
+If writes fail (readback shows old data or zeros), check ESP32 serial log for DMI errors — likely a tunnel timing issue with the program buffer POSTEXEC sequence.
 
 ### 3.6 UART Console Relay
 
-- [ ] `mosquitto_sub -t "device/<id>/console/out"` shows LiteX BIOS output
-- [ ] `mosquitto_pub -t "device/<id>/console/in" -m "help"` sends keystroke to BIOS
-- [ ] BIOS responds with help text on console/out
-- [ ] After loading hello.bin, UART output appears on console/out
+Verify the LiteX BIOS is reachable before loading test binaries (console/out is how we observe binary output).
 
-### 3.7 Memory Read/Write
+```bash
+# Terminal 2 should already be running mosquitto_sub
 
-While halted:
-- [ ] `x/4x 0xf0001800` reads LED CSR register
-- [ ] `set *0x10000000 = 0xdeadbeef` writes SRAM
-- [ ] `x/x 0x10000000` confirms the write
-- [ ] `set *0xf0001800 = 0x3` writes LED CSR (no visible LEDs on dock, but verify register reads back)
+# Terminal 3: send a command to the BIOS
+mosquitto_pub -h <broker> -t "device/<device-id>/console/in" -m "help"
+```
+
+- [ ] LiteX BIOS banner visible on console/out after FPGA power-on
+- [ ] `help` command returns BIOS help text on console/out
+- [ ] `ident` command returns board identifier
+
+### 3.7 Load Test Binaries
+
+Requires: memory writes working (3.5) and UART relay working (3.6).
+
+Note: Tang Primer 25K dock has no user LEDs. Test binaries use UART output.
+
+Upload binaries to ESP32 ramfs:
+```bash
+mosquitto_pub -h <broker> -t "device/<device-id>/file/cmd" \
+  -m '{"action":"download","url":"http://<host>/hello.bin","name":"hello.bin"}'
+mosquitto_pub -h <broker> -t "device/<device-id>/file/cmd" \
+  -m '{"action":"download","url":"http://<host>/count.bin","name":"count.bin"}'
+```
+
+Load and verify hello.bin:
+```
+(gdb) monitor riscv_load hello.bin
+```
+
+- [ ] GDB prints "Loaded hello.bin (87 bytes) at 0x10000000, running"
+- [ ] "Hello from VexRiscv!" appears on console/out (Terminal 2)
+
+Load and verify count.bin:
+```
+(gdb) monitor riscv_load count.bin
+```
+
+- [ ] "0x00000000", "0x00000001", ... appears on console/out, incrementing every ~0.5s
+- [ ] Ctrl-C halts — counter stops
+- [ ] `info registers` — s0 holds the current count value
+- [ ] `continue` — counter resumes from where it left off (not from 0)
 
 ### 3.8 Breakpoints
 
-- [ ] `break *0x10000000` sets hardware breakpoint at SRAM base
-- [ ] Load blink0.bin, execution halts at 0x10000000
+```
+(gdb) monitor riscv_load hello.bin
+(gdb) break *0x10000000
+(gdb) monitor riscv_load hello.bin
+```
+
+- [ ] Execution halts at 0x10000000 (before printing anything)
 - [ ] `info breakpoints` shows the breakpoint
-- [ ] `delete 1` clears it
-- [ ] `continue` resumes execution
+- [ ] `info registers` — PC is 0x10000000
+- [ ] `continue` — "Hello from VexRiscv!" appears on console/out
+- [ ] `delete 1` clears the breakpoint
 
 ### 3.9 Backend Switching
 
-- [ ] `monitor target local` switches back to local ESP32 debug
-- [ ] `info threads` shows FreeRTOS tasks again
-- [ ] `monitor target jtag` switches back to FPGA
-- [ ] JTAG operations still work after round-trip
+```
+(gdb) monitor target local
+(gdb) flushregs
+(gdb) info threads
+(gdb) monitor target jtag
+(gdb) flushregs
+(gdb) x/4x 0x10000000
+```
+
+- [ ] `monitor target local` — `info threads` shows FreeRTOS tasks
+- [ ] `monitor target jtag` — JTAG operations still work after round-trip
+- [ ] Memory contents from previous JTAG session are preserved
 
 ## Phase 4: Edge Cases
 
