@@ -103,15 +103,15 @@ Wire the ESP32-C3 to the Tang Primer 25K per the pin table in `docs/tang-primer-
 
 ### 3.1 Wiring
 
-| ESP32-C3 GPIO | Signal | PMOD j4 Pin |
-|---------------|--------|-------------|
-| GPIO2         | TCK    | j4:0        |
-| GPIO3         | TMS    | j4:3        |
-| GPIO4         | TDI    | j4:1        |
-| GPIO5         | TDO    | j4:2        |
-| GPIO6         | TX     | serial_rx   |
-| GPIO7         | RX     | serial_tx   |
-| GND           | GND    | GND         |
+| ESP32-C3 GPIO | Signal         | PMOD j4 Pin | FPGA Pin |
+|---------------|----------------|-------------|----------|
+| GPIO2         | TCK            | j4:0        | G11      |
+| GPIO3         | TMS            | j4:3        | C11      |
+| GPIO4         | TDI            | j4:1        | D11      |
+| GPIO5         | TDO            | j4:2        | B11      |
+| GPIO6         | TX (ESP->FPGA) | j4:5        | D10      |
+| GPIO7         | RX (FPGA->ESP) | j4:4        | G10      |
+| GND           | GND            | GND         |          |
 
 ### 3.2 Build for Direct JTAG
 
@@ -148,14 +148,15 @@ riscv32-esp-elf-gdb -ex "target remote localhost:3333"
 - [ ] Ctrl-C halts the VexRiscv (ESP32 log confirms halt)
 - [ ] `info registers` works while halted
 - [ ] `continue` resumes the VexRiscv
-- [ ] LEDs resume chasing after continue
 
 ### 3.5 Load Test Binaries
 
+Note: Tang Primer 25K dock has no user LEDs (LED chaser outputs E8/D7 not connected). Verify test binaries via UART output and register inspection instead.
+
 - [ ] Upload blink0.bin to ramfs via file manager
-- [ ] `monitor riscv_load blink0.bin` — LED 0 slow blinks
-- [ ] Upload blink1.bin, `monitor riscv_load blink1.bin` — LED 1 double blinks
-- [ ] Upload hello.bin, `monitor riscv_load hello.bin` — UART output + LED cycle
+- [ ] `monitor riscv_load blink0.bin` — verify PC set to 0x10000000 via registers
+- [ ] Upload blink1.bin, `monitor riscv_load blink1.bin` — verify load succeeds
+- [ ] Upload hello.bin, `monitor riscv_load hello.bin` — UART output on console/out
 
 ### 3.6 UART Console Relay
 
@@ -170,7 +171,7 @@ While halted:
 - [ ] `x/4x 0xf0001800` reads LED CSR register
 - [ ] `set *0x10000000 = 0xdeadbeef` writes SRAM
 - [ ] `x/x 0x10000000` confirms the write
-- [ ] `set *0xf0001800 = 0x3` sets both LEDs on via CSR
+- [ ] `set *0xf0001800 = 0x3` writes LED CSR (no visible LEDs on dock, but verify register reads back)
 
 ### 3.8 Breakpoints
 

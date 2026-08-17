@@ -174,6 +174,6 @@ This runs the full flow: LiteX SoC generation -> yosys synthesis -> nextpnr plac
 
 **JTAG not responding**: Verify `monitor target jtag` was issued (defaults to local backend). Check TCK/TMS/TDI/TDO wiring matches the pin table. The JTAG TAP runs in its own clock domain -- no frequency matching needed.
 
-**riscv_load hangs**: The debug module may not have halted the CPU. Try `monitor target jtag` again to reinitialize. Check that the FPGA bitstream was flashed successfully (LEDs should be chasing on boot).
+**riscv_load hangs**: The debug module may not have halted the CPU. Try `monitor target jtag` again to reinitialize. Check that the FPGA bitstream was flashed successfully (DONE LED should be solid green, READY blinking).
 
 **openFPGALoader doesn't detect the board**: Try `openFPGALoader --detect` to list connected devices. The Tang Primer 25K uses a BL616 USB-JTAG bridge.

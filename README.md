@@ -213,7 +213,7 @@ The RISC-V Debug Module driver (`riscv_dm.c`) uses a compile-time selected trans
 
 **ECP5 JTAGG tunneling** (`ecp5_jtag.c`): The VexRiscv debug TAP sits behind the ECP5's JTAGG primitive. Each bit of the inner TAP is clocked by shifting 2-bit {tms,tdi} pairs through the ECP5's ER1/ER2 registers. This also enables bitstream programming via the ECP5 JTAG port.
 
-**Direct JTAG** (`jtag_bitbang.c` only): The soft core's JTAG TAP is directly wired to ESP32 GPIO pins. The 5-bit DTM IR (DTMCS, DMI) and variable-length DR (41-bit DMI frames) are shifted directly. Simpler and faster, but no FPGA programming capability.
+**Direct JTAG** (`jtag_bitbang.c` + `riscv_dm.c`): The soft core's JTAG TAP is wired to ESP32 GPIO pins. For VexRiscv SMP, the debug module sits behind a tunnel TAP: a 6-bit outer IR selects the tunnel instruction (0x23), then 14-bit headers set the inner register (DTMCS/DMI), and 50-bit DR frames carry DMI data with TDI/TDO pipeline delays. Idle clocks between DR shifts accommodate the clock domain crossing. No FPGA programming capability.
 
 Select with `CONFIG_JTAG_TRANSPORT_ECP5` or `CONFIG_JTAG_TRANSPORT_DIRECT` in menuconfig.
 
@@ -227,7 +227,7 @@ Select with `CONFIG_JTAG_TRANSPORT_ECP5` or `CONFIG_JTAG_TRANSPORT_DIRECT` in me
 
 - RISC-V single-core @ 160 MHz
 - WiFi 802.11 b/g/n
-- 400 KB SRAM, 4 MB flash
+- 400 KB SRAM, 2 MB flash
 - GPIOs 2-5: JTAG (TCK, TMS, TDI, TDO)
 - GPIO 6-7: UART1 (console relay TX/RX)
 
