@@ -215,12 +215,22 @@ Requires: memory writes working (3.5) and UART relay working (3.6).
 
 Note: Tang Primer 25K dock has no user LEDs. Test binaries use UART output.
 
+Start a local HTTP server to serve the test binaries to the ESP32. The ESP32's file manager downloads files over HTTP, so this must be reachable from the ESP32's WiFi network:
+
+```bash
+# Terminal 4: serve test binaries (run from the riscv/ directory)
+cd /path/to/esp32-gdb-mqtt-test-bitstreams/riscv
+python3 -m http.server 8080
+```
+
+Verify the server is reachable by checking your machine's IP on the same network as the ESP32 (e.g. `ifconfig en0` or `ip addr`). The ESP32 will fetch from `http://<your-ip>:8080/<filename>`.
+
 Upload binaries to ESP32 ramfs:
 ```bash
 mosquitto_pub -h <broker> -t "device/<device-id>/file/cmd" \
-  -m '{"action":"download","url":"http://<host>/hello.bin","name":"hello.bin"}'
+  -m '{"action":"download","url":"http://<your-ip>:8080/hello.bin","name":"hello.bin"}'
 mosquitto_pub -h <broker> -t "device/<device-id>/file/cmd" \
-  -m '{"action":"download","url":"http://<host>/count.bin","name":"count.bin"}'
+  -m '{"action":"download","url":"http://<your-ip>:8080/count.bin","name":"count.bin"}'
 ```
 
 Load and verify hello.bin:
