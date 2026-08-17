@@ -6,7 +6,7 @@ Hardware required:
 - 7 jumper wires (male-to-female)
 - Micro-USB cable (ESP32-C3)
 - USB-C cable (Tang Primer 25K)
-- Mac with MQTT broker (mosquitto)
+- MQTT broker (mosquitto) reachable by the ESP32 over WiFi
 
 ## Phase 1: ESP32-C3 Standalone
 
