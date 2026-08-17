@@ -253,10 +253,15 @@ Load and verify count.bin:
 
 ### 3.8 Breakpoints
 
+Requires: FPGA bitstream built with `hardware_breakpoints = 2` in `build_soc_tang.py`.
+The bitstream build script is in `esp32-gdb-mqtt-test-bitstreams/riscv/build_soc_tang.py`.
+
+#### 3.8.1 Entry Breakpoint (hello.bin)
+
 ```
 (gdb) monitor riscv_load hello.bin
 (gdb) break *0x10000000
-(gdb) monitor riscv_load hello.bin
+(gdb) continue
 ```
 
 - [ ] Execution halts at 0x10000000 (before printing anything)
@@ -264,6 +269,32 @@ Load and verify count.bin:
 - [ ] `info registers` — PC is 0x10000000
 - [ ] `continue` — "Hello from VexRiscv!" appears on console/out
 - [ ] `delete 1` clears the breakpoint
+
+#### 3.8.2 Loop Breakpoint and Continue (count.bin)
+
+count.bin is a tight loop: `_start` at 0x10000000 (executes once), `loop` at 0x10000004 (repeats). This tests that GDB's step-past-breakpoint dance works (remove bp → single step → re-insert bp → continue).
+
+```
+(gdb) monitor riscv_load count.bin
+(gdb) break *0x10000000
+(gdb) continue
+```
+
+- [ ] "Thread 1 hit Breakpoint 1, 0x10000000" — halts at entry before any output
+- [ ] `info registers` — PC is 0x10000000
+- [ ] `continue` — counter output starts on console/out (0x00000000, 0x00000001, ...)
+- [ ] Note: breakpoint at 0x10000000 only fires once because the loop jumps to 0x10000004
+
+```
+(gdb) delete 1
+(gdb) break *0x10000004
+(gdb) continue
+```
+
+- [ ] Breakpoint fires at 0x10000004 (inside the loop)
+- [ ] `continue` again — breakpoint fires again (step-past-breakpoint works)
+- [ ] `info registers` — fp (s0/x8) holds the current count value, incrementing between hits
+- [ ] `delete` all breakpoints, `continue` — counter runs freely on console/out
 
 ### 3.9 Backend Switching
 
