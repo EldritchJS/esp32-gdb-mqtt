@@ -111,7 +111,7 @@ Wire the ESP32-C3 to the Tang Primer 25K per the pin table in `docs/tang-primer-
 | GPIO5         | TDO            | j4:2        | B11      |
 | GPIO6         | TX (ESP->FPGA) | j4:5        | D10      |
 | GPIO7         | RX (FPGA->ESP) | j4:4        | G10      |
-| GND           | GND            | GND         |          |
+| GND           | GND            | GND         | GND      |
 
 ### 3.2 Build for Direct JTAG
 
