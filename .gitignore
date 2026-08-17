@@ -1,0 +1,8 @@
+.pio
+.vscode
+managed_components
+dependencies.lock
+sdkconfig.esp32-c3-devkitm-1
+CMakeLists.txt
+__pycache__
+*.pyc

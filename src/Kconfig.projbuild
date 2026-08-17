@@ -1,0 +1,98 @@
+menu "GDB over MQTT"
+
+    config GDB_MQTT_WIFI_SSID
+        string "WiFi SSID"
+        default "myssid"
+
+    config GDB_MQTT_WIFI_PASSWORD
+        string "WiFi Password"
+        default "mypassword"
+
+    config GDB_MQTT_BROKER_URI
+        string "MQTT Broker URI"
+        default "mqtt://192.168.1.1:1883"
+
+    config GDB_MQTT_DEVICE_ID
+        string "Device ID"
+        default "esp32c3-001"
+        help
+            Used in MQTT topic paths: device/{id}/gdb/cmd and device/{id}/gdb/resp
+
+endmenu
+
+menu "File Manager"
+
+    config FILE_MANAGER_MAX_FILE_SIZE
+        int "Maximum file size (bytes)"
+        default 65536
+        help
+            Maximum size of a single file download. Limited by available heap.
+            RISC-V test binaries are ~100-200 bytes. FPGA bitstreams are too
+            large for RAM and should use streaming (future feature).
+
+endmenu
+
+choice JTAG_TRANSPORT
+    prompt "JTAG transport"
+    default JTAG_TRANSPORT_ECP5
+
+    config JTAG_TRANSPORT_ECP5
+        bool "ECP5 JTAGG tunneling"
+        help
+            Tunnel through the ECP5 JTAGG primitive to reach the
+            soft core debug TAP. Used with ULX3S / ECP5 boards.
+
+    config JTAG_TRANSPORT_DIRECT
+        bool "Direct JTAG (GPIO to TAP)"
+        help
+            Drive the soft core JTAG TAP directly via GPIO pins.
+            Used with boards that expose TAP signals on headers
+            (e.g. Tang Primer 25K with VexRiscv SMP jtag_tap).
+
+endchoice
+
+menu "UART Console Relay"
+
+    config UART_RELAY_ENABLE
+        bool "Enable UART-to-MQTT console relay"
+        default n
+        help
+            Bridge a hardware UART to MQTT topics so the FPGA soft
+            core's serial console is accessible remotely.
+
+    config UART_RELAY_TX_PIN
+        int "TX GPIO pin (ESP32 → FPGA RX)"
+        default 6
+        depends on UART_RELAY_ENABLE
+
+    config UART_RELAY_RX_PIN
+        int "RX GPIO pin (FPGA TX → ESP32)"
+        default 7
+        depends on UART_RELAY_ENABLE
+
+    config UART_RELAY_BAUD
+        int "Baud rate"
+        default 115200
+        depends on UART_RELAY_ENABLE
+
+endmenu
+
+menu "JTAG Bit-Bang"
+
+    config JTAG_PIN_TCK
+        int "TCK GPIO pin"
+        default 2
+
+    config JTAG_PIN_TMS
+        int "TMS GPIO pin"
+        default 3
+
+    config JTAG_PIN_TDI
+        int "TDI GPIO pin"
+        default 4
+
+    config JTAG_PIN_TDO
+        int "TDO GPIO pin"
+        default 5
+
+endmenu
