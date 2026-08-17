@@ -151,12 +151,12 @@ riscv32-esp-elf-gdb -ex "target remote localhost:3333"
 
 ### 3.5 Load Test Binaries
 
-Note: Tang Primer 25K dock has no user LEDs (LED chaser outputs E8/D7 not connected). Verify test binaries via UART output and register inspection instead.
+Note: Tang Primer 25K dock has no user LEDs. Test binaries use UART output instead.
 
-- [ ] Upload blink0.bin to ramfs via file manager
-- [ ] `monitor riscv_load blink0.bin` — verify PC set to 0x10000000 via registers
-- [ ] Upload blink1.bin, `monitor riscv_load blink1.bin` — verify load succeeds
-- [ ] Upload hello.bin, `monitor riscv_load hello.bin` — UART output on console/out
+- [ ] Upload hello.bin to ramfs via file manager
+- [ ] `monitor riscv_load hello.bin` — "Hello from VexRiscv!" appears on console/out
+- [ ] Upload count.bin, `monitor riscv_load count.bin` — incrementing hex counter on console/out
+- [ ] Halt (Ctrl-C) — counter stops; resume (`continue`) — counter continues from where it left off
 
 ### 3.6 UART Console Relay
 

@@ -110,28 +110,28 @@ Connect GDB over MQTT and check the debug module responds:
 
 ## 5. Load and Run Test Binaries
 
-Three test binaries are pre-built in `~/fpga/test-bitstreams/`:
+Test binaries are in the companion [test-bitstreams](https://github.com/EldritchJS/esp32-gdb-mqtt-test-bitstreams) repository under `riscv/`:
 
 | Binary | Size | Behavior |
 |--------|------|----------|
-| `riscv-blink0/blink0.bin` | ~60 B | Slow blink on LED 0 |
-| `riscv-blink1/blink1.bin` | ~80 B | Double-blink on LED 1 |
-| `riscv-hello/hello.bin` | 226 B | Prints to UART, cycles LEDs |
+| `hello.bin` | 87 B | Prints "Hello from VexRiscv!" to UART, then spins |
+| `count.bin` | 184 B | Prints incrementing hex counter to UART every ~0.5s |
+
+Note: The Tang Primer 25K dock has no user LEDs, so all test binaries use UART output. Monitor via `mosquitto_sub -t "device/<id>/console/out"`.
 
 Upload a binary to the ESP32's ramfs, then load it:
 
 ```
-(gdb) monitor riscv_load blink0.bin
+(gdb) monitor riscv_load hello.bin
 ```
 
-This halts the CPU, writes the binary to SRAM at 0x10000000, sets the PC, and resumes. Load `blink1.bin` next to confirm the cycle works -- you should see the LED pattern change.
+This halts the CPU, writes the binary to SRAM at 0x10000000, sets the PC, and resumes. Load `count.bin` next to verify halt/resume -- the counter should stop when halted and continue from where it left off.
 
 To rebuild the test binaries:
 
 ```bash
-cd ~/fpga/test-bitstreams
-export PATH="$HOME/.platformio/packages/toolchain-riscv32-esp/bin:$PATH"
-make riscv
+cd ~/path/to/esp32-gdb-mqtt-test-bitstreams/riscv
+make
 ```
 
 ## SoC Memory Map
