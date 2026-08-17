@@ -105,7 +105,8 @@
 #define DM_MCONTROL_TYPE    (2UL << 28)
 #define DM_MCONTROL_EXECUTE (1 << 2)
 #define DM_MCONTROL_M_MODE  (1 << 6)
-#define DM_MCONTROL_ACTION_HALT (0 << 12)
+#define DM_MCONTROL_DMODE       (1UL << 27)
+#define DM_MCONTROL_ACTION_HALT (1 << 12)
 
 int dm_init(void);
 int dm_read(uint8_t addr, uint32_t *value);
@@ -117,5 +118,6 @@ int dm_read_gpr(int reg_num, uint32_t *value);
 int dm_write_gpr(int reg_num, uint32_t value);
 int dm_read_csr(int csr, uint32_t *value);
 int dm_write_csr(int csr, uint32_t value);
+int dm_fence_i(void);
 int dm_read_memory(uint32_t addr, uint8_t *buf, size_t len);
 int dm_write_memory(uint32_t addr, const uint8_t *buf, size_t len);

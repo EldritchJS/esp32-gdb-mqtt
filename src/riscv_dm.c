@@ -221,6 +221,27 @@ int dm_read_csr(int csr, uint32_t *value)
                    AC_AARSIZE_32 | AC_TRANSFER |
                    AC_REGNO(csr);
     if (dm_write(DM_COMMAND, cmd) != 0) return -1;
+    if (wait_abstract_cmd() == 0)
+        return dm_read(DM_DATA0, value);
+
+    /* Abstract CSR access failed — fall back to program buffer. */
+    uint32_t csrr_s0 = 0x00002473 | ((uint32_t)csr << 20); /* csrr s0, <csr> */
+    uint32_t ebreak  = 0x00100073;
+    if (dm_write(DM_PROGBUF0, csrr_s0) != 0) return -1;
+    if (dm_write(DM_PROGBUF1, ebreak) != 0) return -1;
+
+    if (dm_write(DM_DATA0, 0) != 0) return -1;
+    uint32_t pbcmd = (AC_ACCESS_REGISTER << 24) |
+                     AC_AARSIZE_32 | AC_TRANSFER | AC_WRITE |
+                     AC_POSTEXEC |
+                     AC_REGNO(AC_REG_GPR_BASE + 8); /* s0 */
+    if (dm_write(DM_COMMAND, pbcmd) != 0) return -1;
+    if (wait_abstract_cmd() != 0) return -1;
+
+    uint32_t rdcmd = (AC_ACCESS_REGISTER << 24) |
+                     AC_AARSIZE_32 | AC_TRANSFER |
+                     AC_REGNO(AC_REG_GPR_BASE + 8);
+    if (dm_write(DM_COMMAND, rdcmd) != 0) return -1;
     if (wait_abstract_cmd() != 0) return -1;
     return dm_read(DM_DATA0, value);
 }
@@ -231,6 +252,35 @@ int dm_write_csr(int csr, uint32_t value)
     uint32_t cmd = (AC_ACCESS_REGISTER << 24) |
                    AC_AARSIZE_32 | AC_TRANSFER | AC_WRITE |
                    AC_REGNO(csr);
+    if (dm_write(DM_COMMAND, cmd) != 0) return -1;
+    if (wait_abstract_cmd() == 0) return 0;
+
+    /* Abstract CSR access failed — fall back to program buffer.
+     * VexRiscv SMP doesn't support abstract access for some CSRs (e.g. DPC). */
+    uint32_t csrw_s0 = 0x00041073 | ((uint32_t)csr << 20); /* csrw <csr>, s0 */
+    uint32_t ebreak  = 0x00100073;
+    if (dm_write(DM_PROGBUF0, csrw_s0) != 0) return -1;
+    if (dm_write(DM_PROGBUF1, ebreak) != 0) return -1;
+
+    if (dm_write(DM_DATA0, value) != 0) return -1;
+    uint32_t pbcmd = (AC_ACCESS_REGISTER << 24) |
+                     AC_AARSIZE_32 | AC_TRANSFER | AC_WRITE |
+                     AC_POSTEXEC |
+                     AC_REGNO(AC_REG_GPR_BASE + 8); /* s0 */
+    if (dm_write(DM_COMMAND, pbcmd) != 0) return -1;
+    return wait_abstract_cmd();
+}
+
+int dm_fence_i(void)
+{
+    uint32_t fence_i = 0x0000100F;
+    uint32_t ebreak  = 0x00100073;
+    if (dm_write(DM_PROGBUF0, fence_i) != 0) return -1;
+    if (dm_write(DM_PROGBUF1, ebreak) != 0) return -1;
+
+    uint32_t cmd = (AC_ACCESS_REGISTER << 24) |
+                   AC_AARSIZE_32 | AC_POSTEXEC |
+                   AC_REGNO(AC_REG_GPR_BASE);
     if (dm_write(DM_COMMAND, cmd) != 0) return -1;
     return wait_abstract_cmd();
 }

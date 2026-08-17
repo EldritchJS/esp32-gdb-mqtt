@@ -35,7 +35,9 @@ class GdbMqttBridge:
     def on_mqtt_message(self, client, userdata, msg):
         if self.gdb_conn:
             try:
-                self.gdb_conn.sendall(msg.payload)
+                data = msg.payload
+                print(f"[esp→gdb] {data!r}")
+                self.gdb_conn.sendall(data)
             except (BrokenPipeError, ConnectionResetError):
                 print("[gdb] Connection lost")
                 self.gdb_conn = None
@@ -58,6 +60,7 @@ class GdbMqttBridge:
                     print("[gdb] Disconnected")
                     self.gdb_conn = None
                     continue
+                print(f"[gdb→esp] {data!r}")
                 self.mqtt_client.publish(self.cmd_topic, data, qos=1)
             except (ConnectionResetError, OSError):
                 self.gdb_conn = None

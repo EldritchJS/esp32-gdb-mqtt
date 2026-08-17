@@ -13,7 +13,6 @@ static const char *TAG = "target-jtag";
 
 static bool s_halted;
 static bool s_initialized;
-
 static struct {
     uint32_t addr;
     bool active;
@@ -70,6 +69,14 @@ static int jtag_backend_init(void)
     }
 
     s_initialized = true;
+
+    if (dm_halt() != 0) {
+        ESP_LOGE(TAG, "Failed to halt CPU after init");
+        return -1;
+    }
+    s_halted = true;
+    save_scratch_regs();
+
     ESP_LOGI(TAG, "JTAG backend initialized — connected to soft core");
     return 0;
 }
@@ -90,7 +97,7 @@ static int jtag_halt(void)
     for (int i = 0; i < TARGET_MAX_BREAKPOINTS; i++) {
         if (!s_breakpoints[i].active) continue;
         dm_write_csr(CSR_TSELECT, i);
-        dm_write_csr(CSR_TDATA1, DM_MCONTROL_TYPE | DM_MCONTROL_EXECUTE |
+        dm_write_csr(CSR_TDATA1, DM_MCONTROL_TYPE | DM_MCONTROL_DMODE | DM_MCONTROL_EXECUTE |
                                   DM_MCONTROL_M_MODE | DM_MCONTROL_ACTION_HALT);
         dm_write_csr(CSR_TDATA2, s_breakpoints[i].addr);
     }
@@ -106,9 +113,14 @@ static int jtag_resume(void)
 
     restore_scratch_regs();
 
-    if (dm_resume() != 0) return -1;
+    int rc = dm_resume();
     s_halted = false;
     s_regs_saved = false;
+
+    if (rc != 0) {
+        ESP_LOGW(TAG, "dm_resume timeout (CPU may have hit breakpoint immediately)");
+    }
+
     ESP_LOGI(TAG, "Hart resumed");
     return 0;
 }

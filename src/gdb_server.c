@@ -351,6 +351,15 @@ static void handle_continue(void)
     s_running = true;
 }
 
+static void handle_step(void)
+{
+    uint32_t dpc;
+    if (dm_read_csr(AC_REG_DPC, &dpc) == 0) {
+        dm_write_csr(AC_REG_DPC, dpc + 4);
+    }
+    send_rsp_str("S05");
+}
+
 static void handle_set_thread(const char *pkt)
 {
     const char *p = pkt + 2;
@@ -653,7 +662,7 @@ static void handle_monitor_cmd(const char *pkt)
             resp[len] = '\0';
             send_rsp_str(resp);
         } else {
-            dm_halt();
+            target_halt();
             int rc = dm_write_memory(addr, f->data, f->size);
             if (rc != 0) {
                 char msg[64];
@@ -663,10 +672,10 @@ static void handle_monitor_cmd(const char *pkt)
                 resp[len] = '\0';
                 send_rsp_str(resp);
             } else {
+                dm_fence_i();
                 dm_write_csr(AC_REG_DPC, addr);
-                dm_resume();
                 char msg[96];
-                snprintf(msg, sizeof(msg), "Loaded %s (%zu bytes) at 0x%08lx, running\n",
+                snprintf(msg, sizeof(msg), "Loaded %s (%zu bytes) at 0x%08lx, use 'continue' to run\n",
                          name, f->size, (unsigned long)addr);
                 char resp[192];
                 size_t len = hex_encode((const uint8_t *)msg, strlen(msg), resp);
@@ -745,7 +754,7 @@ static void handle_packet(const char *pkt, size_t len)
         handle_continue();
         break;
     case 's':
-        send_empty();
+        handle_step();
         break;
     case 'H':
         handle_set_thread(pkt);
@@ -785,6 +794,12 @@ static void handle_packet(const char *pkt, size_t len)
     case 'v':
         if (strncmp(pkt, "vMustReplyEmpty", 15) == 0) {
             send_empty();
+        } else if (strncmp(pkt, "vCont?", 6) == 0) {
+            send_rsp_str("vCont;c;s");
+        } else if (strncmp(pkt, "vCont;c", 7) == 0) {
+            handle_continue();
+        } else if (strncmp(pkt, "vCont;s", 7) == 0) {
+            handle_step();
         } else {
             send_empty();
         }
