@@ -21,18 +21,26 @@
  *   Total: 41 bits
  */
 
-/* DTM IR values */
-#define DTM_IR_DTMCS  0x01
-#define DTM_IR_DMI    0x11
+/* Outer TAP IR (VexRiscv SMP tunneled JTAG) */
+#define TAP_IR_LEN       6
+#define TAP_IR_TUNNEL    0x23
+#define TAP_IR_IDCODE    0x01
 
-/* DTM IR length (VexRiscv default) */
-#define DTM_IR_LEN    5
+/* Inner tunnel instructions */
+#define TUNNEL_IR_DTMCS  0x10
+#define TUNNEL_IR_DMI    0x11
+#define TUNNEL_HDR_BITS  14
 
 /* DMI field widths (VexRiscv) */
 #define DMI_OP_BITS   2
 #define DMI_DATA_BITS 32
 #define DMI_ADDR_BITS 7
 #define DMI_TOTAL_BITS (DMI_OP_BITS + DMI_DATA_BITS + DMI_ADDR_BITS)
+
+/* Tunnel pipeline: TDI delayed 9 clocks, TDO delayed 4 clocks */
+#define TUNNEL_TDI_DELAY  9
+#define TUNNEL_TDO_DELAY  4
+#define TUNNEL_DR_BITS    (DMI_TOTAL_BITS + TUNNEL_TDI_DELAY)
 
 /* DMI op codes */
 #define DMI_OP_NOP    0

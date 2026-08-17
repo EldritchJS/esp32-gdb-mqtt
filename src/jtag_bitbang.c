@@ -143,6 +143,9 @@ static void goto_shift_dr(void)
         break;
     case TAP_UPDATE_DR:
     case TAP_UPDATE_IR:
+        jtag_clock(false, false); navigate(false);  /* -> Idle */
+        for (int i = 0; i < 8; i++)
+            jtag_clock(false, false);               /* idle clocks for CDC */
         jtag_clock(true, false); navigate(true);   /* -> Select-DR */
         jtag_clock(false, false); navigate(false);  /* -> Capture-DR */
         jtag_clock(false, false); navigate(false);  /* -> Shift-DR */

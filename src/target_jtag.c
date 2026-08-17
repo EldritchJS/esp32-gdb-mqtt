@@ -59,7 +59,9 @@ static int jtag_backend_init(void)
         return -1;
     }
 #else
+    jtag_init();
     jtag_reset();
+    jtag_goto_idle();
 #endif
 
     if (dm_init() != 0) {

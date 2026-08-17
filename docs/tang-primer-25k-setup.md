@@ -38,12 +38,12 @@ openFPGALoader -b tangprimer25k -f ~/fpga/build/tang-primer-25k-soc/gateware/sip
 | GPIO4         | TDI    | j4:1        | D11      |
 | GPIO5         | TDO    | j4:2        | B11      |
 
-### UART Console Relay
+### UART Console Relay (PMOD j4, bottom row)
 
-| ESP32-C3 GPIO | Signal       | Tang Primer Pin |
-|---------------|--------------|-----------------|
-| GPIO6         | TX (ESP->FPGA) | serial_rx     |
-| GPIO7         | RX (FPGA->ESP) | serial_tx     |
+| ESP32-C3 GPIO | Signal         | PMOD j4 Pin | FPGA Pin |
+|---------------|----------------|-------------|----------|
+| GPIO6         | TX (ESP->FPGA) | j4:5        | D10      |
+| GPIO7         | RX (FPGA->ESP) | j4:4        | G10      |
 
 ### Ground
 

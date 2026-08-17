@@ -16,59 +16,68 @@
 
 static const char *TAG = "riscv-dm";
 
-static uint8_t s_dtm_ir = 0xFF;
+static bool s_tunnel_ready;
 
-static void dtm_set_ir(uint8_t ir)
+static void tunnel_set_ir(void)
 {
-    if (s_dtm_ir == ir) return;
-    s_dtm_ir = ir;
-    dm_shift_ir(&ir, NULL, DTM_IR_LEN);
+    uint8_t ir = TAP_IR_TUNNEL;
+    dm_shift_ir(&ir, NULL, TAP_IR_LEN);
 }
 
-static void pack_dmi(uint8_t *buf, uint8_t addr, uint32_t data, uint8_t op)
+static void tunnel_set_inner(uint8_t inner_ir)
 {
-    memset(buf, 0, 6);
-    /* bits [1:0] = op */
-    buf[0] = op & 0x03;
-    /* bits [33:2] = data, shifted left by 2 */
-    uint64_t val = ((uint64_t)data << 2) | op;
-    val |= ((uint64_t)addr << 34);
+    uint8_t tdi[2] = {0};
+    tdi[0] = inner_ir & 0x3F;
+    tdi[1] = 0;
+    dm_shift_dr(tdi, NULL, TUNNEL_HDR_BITS);
+}
+
+/*
+ * Tunnel DR frame: 50 bits total (41 DMI + 9 TDI pipeline delay).
+ * TDI stream (LSB first): DMI data [40:0], padding [48:41], mode=1 [49].
+ * TDO stream: garbage [3:0], DMI response [44:4], garbage [49:45].
+ */
+static void pack_tunnel_dmi(uint8_t *buf, uint8_t addr, uint32_t data, uint8_t op)
+{
+    memset(buf, 0, 7);
+    uint64_t val = ((uint64_t)addr << 34) | ((uint64_t)data << 2) | (op & 0x03);
+    val |= (1ULL << 49);
     buf[0] = val & 0xFF;
     buf[1] = (val >> 8) & 0xFF;
     buf[2] = (val >> 16) & 0xFF;
     buf[3] = (val >> 24) & 0xFF;
     buf[4] = (val >> 32) & 0xFF;
     buf[5] = (val >> 40) & 0xFF;
+    buf[6] = (val >> 48) & 0xFF;
 }
 
-static void unpack_dmi(const uint8_t *buf, uint8_t *addr, uint32_t *data, uint8_t *op)
+static void unpack_tunnel_dmi(const uint8_t *tdo, uint32_t *data, uint8_t *op)
 {
     uint64_t val = 0;
-    for (int i = 5; i >= 0; i--) {
-        val = (val << 8) | buf[i];
+    for (int i = 6; i >= 0; i--) {
+        val = (val << 8) | tdo[i];
     }
+    val >>= TUNNEL_TDO_DELAY;
     *op = val & 0x03;
     *data = (val >> 2) & 0xFFFFFFFF;
-    *addr = (val >> 34) & 0x7F;
 }
 
 static int dmi_transfer(uint8_t addr, uint32_t wdata, uint8_t op,
                         uint32_t *rdata)
 {
-    dtm_set_ir(DTM_IR_DMI);
+    if (!s_tunnel_ready) return -1;
 
-    uint8_t tdi[6], tdo[6];
-    pack_dmi(tdi, addr, wdata, op);
-    dm_shift_dr(tdi, tdo, DMI_TOTAL_BITS);
+    uint8_t tdi[7], tdo[7];
+    pack_tunnel_dmi(tdi, addr, wdata, op);
+    dm_shift_dr(tdi, tdo, TUNNEL_DR_BITS);
 
-    /* The response comes back on the *next* transaction */
     for (int retry = 0; retry < 16; retry++) {
-        pack_dmi(tdi, 0, 0, DMI_OP_NOP);
-        dm_shift_dr(tdi, tdo, DMI_TOTAL_BITS);
+        pack_tunnel_dmi(tdi, 0, 0, DMI_OP_NOP);
+        dm_shift_dr(tdi, tdo, TUNNEL_DR_BITS);
 
-        uint8_t resp_op, resp_addr;
+        uint8_t resp_op;
         uint32_t resp_data;
-        unpack_dmi(tdo, &resp_addr, &resp_data, &resp_op);
+        unpack_tunnel_dmi(tdo, &resp_data, &resp_op);
 
         if (resp_op == DMI_STATUS_OK) {
             if (rdata) *rdata = resp_data;
@@ -98,7 +107,10 @@ int dm_write(uint8_t addr, uint32_t value)
 
 int dm_init(void)
 {
-    s_dtm_ir = 0xFF;
+    s_tunnel_ready = false;
+    tunnel_set_ir();
+    tunnel_set_inner(TUNNEL_IR_DMI);
+    s_tunnel_ready = true;
 
     if (dm_write(DM_DMCONTROL, DMCONTROL_DMACTIVE) != 0) {
         ESP_LOGE(TAG, "Failed to activate debug module");
