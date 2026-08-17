@@ -288,8 +288,3 @@ Load and verify count.bin:
 
 - [ ] Connect two GDB instances to the bridge — verify behavior (expect second to fail or queue)
 
-### 4.4 macOS CDC
-
-- [ ] ESP32-C3 appears as `/dev/cu.usbmodem*` after plugging in
-- [ ] PIO can flash without manual driver intervention
-- [ ] Serial monitor works alongside GDB (different USB endpoints)
